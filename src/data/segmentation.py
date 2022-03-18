@@ -2,18 +2,18 @@ import os
 from pyAudioAnalysis import audioBasicIO as aIO
 from pyAudioAnalysis import audioSegmentation as aS
 import scipy.io.wavfile as wavfile
-import wave
+import numpy as np
 
 
 """
 A script that iterates through the extracted wav files and uses
 pyAudioAnalysis' silence extraction module to make a wav file containing the
-segmented audio (when the participant is speaking -- silence and virtual
-interviewer speech removed)
+segmented audio (when the participant is speaking, silence and virtual
+interviewer speech are removed)
 """
 
 
-def remove_silence(filename, out_dir, smoothing=1.0, weight=0.3, plot=False):
+def remove_silence(filename, out_dir, smoothing=1.0, weight=0.3, store_segments=False, plot=False):
     """
     A function that implements pyAudioAnalysis' silence extraction module
     and creates wav files of the participant specific portions of audio. The
@@ -30,6 +30,8 @@ def remove_silence(filename, out_dir, smoothing=1.0, weight=0.3, plot=False):
         tunable parameter to compensate for sparseness of recordings
     weight : float
         probability threshold for silence removal used in SVM
+    store_segments : float
+        stores no silence segments as wav files within out_dir
     plot : bool
         plots SVM probabilities of silence (used in tuning)
 
@@ -40,82 +42,53 @@ def remove_silence(filename, out_dir, smoothing=1.0, weight=0.3, plot=False):
     and virtual interviewer speech removed. Feature extraction is
     performed on these segmented wav files.
     """
-    partic_id = 'P' + filename.split('/')[-1].split('_')[0]  # PXXX
-    if is_segmentable(partic_id):
+    participant_id = 'P' + filename.split('/')[-1].split('_')[0]  # PXXX
+    if can_segment(participant_id):
         # create participant directory for segmented wav files
-        participant_dir = os.path.join(out_dir, partic_id)
+        participant_dir = os.path.join(out_dir, participant_id)
         if not os.path.exists(participant_dir):
             os.makedirs(participant_dir)
 
-        os.chdir(participant_dir)
+        [fs, x] = aIO.read_audio_file(filename)
+        segments = aS.silence_removal(x, fs, 0.020, 0.020, smooth_window=smoothing, weight=weight, plot=plot)
 
-        [Fs, x] = aIO.readAudioFile(filename)
-        segments = aS.silenceRemoval(x, Fs, 0.020, 0.020,
-                                     smoothWindow=smoothing,
-                                     Weight=weight,
-                                     plot=plot)
-
+        out_file = '{}_no_silence.wav'.format(participant_id)
+        x_no_silence = np.array([], dtype='int16')
         for s in segments:
-            seg_name = "{:s}_{:.2f}-{:.2f}.wav".format(partic_id, s[0], s[1])
-            wavfile.write(seg_name, Fs, x[int(Fs * s[0]):int(Fs * s[1])])
+            segment_no_silence = x[int(fs * s[0]):int(fs * s[1])]
+            if store_segments:  # save no voice segment files within participant directory
+                segment_name = "{:s}_{:.2f}-{:.2f}.wav".format(participant_id, s[0], s[1])
+                wavfile.write(os.path.join(participant_dir, segment_name), fs, segment_no_silence)
+            x_no_silence = np.append(x_no_silence, segment_no_silence)
 
-        # concatenate segmented wave files within participant directory
-        concatenate_segments(participant_dir, partic_id)
+        # save no silence audio within participant directory
+        wavfile.write(os.path.join(participant_dir, out_file), fs, x_no_silence)
 
 
-def is_segmentable(partic_id):
+def can_segment(participant_id):
     """
     A function that returns True if the participant's interview clip is not
-    in the manually identified set of troubled clips. The clips below were
-    not segmentable do to excessive static, proximity to the virtual
+    in the manually identified set of troubled clips. It was not possible to
+    segment the clips below were due to excessive static, proximity to the virtual
     interviewer, volume levels, etc.
     """
-    troubled = set(['P300', 'P305', 'P306', 'P308', 'P315', 'P316', 'P343',
-                    'P354', 'P362', 'P375', 'P378', 'P381', 'P382', 'P385',
-                    'P387', 'P388', 'P390', 'P392', 'P393', 'P395', 'P408',
-                    'P413', 'P421', 'P438', 'P473', 'P476', 'P479', 'P490',
-                    'P492'])
-    return partic_id not in troubled
-
-
-def concatenate_segments(participant_dir, partic_id, remove_segment=True):
-    """
-    A function that concatenates all the wave files in a participants
-    directory in to single wav file (with silence and other speakers removed)
-    and writes in to the participant's directory, then removes the individual
-    segments (when remove_segment=True).
-    """
-    infiles = os.listdir(participant_dir)  # list of wav files in directory
-    outfile = '{}_no_silence.wav'.format(partic_id)
-
-    data = []
-    for infile in infiles:
-        w = wave.open(infile, 'rb')
-        data.append([w.getparams(), w.readframes(w.getnframes())])
-        w.close()
-        if remove_segment:
-            os.remove(infile)
-
-    output = wave.open(outfile, 'wb')
-    # details of the files must be the same (channel, frame rates, etc.)
-    output.setparams(data[0][0])
-
-    # write each segment to output
-    for idx in range(len(data)):
-        output.writeframes(data[idx][1])
-    output.close()
+    troubled = {'P300', 'P305', 'P306', 'P308', 'P315', 'P316', 'P343', 'P354', 'P362', 'P375', 'P378', 'P381', 'P382',
+                'P385', 'P387', 'P388', 'P390', 'P392', 'P393', 'P395', 'P408', 'P413', 'P421', 'P438', 'P473', 'P476',
+                'P479', 'P490', 'P492'}
+    return participant_id not in troubled
 
 
 if __name__ == '__main__':
     # directory containing raw wav files
     dir_name = '../../data/raw/audio'
 
-    # directory where a participant folder will be created containing their
-    # segmented wav file
-    out_dir = '../../data/interim'
+    # directory where a participant folder will be created containing their segmented wav file
+    out_path = '../../data/interim'
 
     # iterate through wav files in dir_name and create a segmented wav_file
     for file in os.listdir(dir_name):
+        if file.endswith('_P'):  # search in participant folders
+            file = os.path.join(file, os.listdir(os.path.join(dir_name, file))[0])
         if file.endswith('.wav'):
-            filename = os.path.join(dir_name, file)
-            remove_silence(filename, out_dir)
+            file_name = os.path.join(dir_name, file)
+            remove_silence(file_name, out_path)
