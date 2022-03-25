@@ -1,0 +1,15 @@
+pyAudioAnalysis
+scipy
+
+eyed3
+pydub
+sklearn
+hmmlearn
+matplotlib
+numpy
+pillow
+
+python-dotenv
+pandas
+boto
+keras
