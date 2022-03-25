@@ -6,6 +6,7 @@
 *.npz
 .DS_Store
 .wav
+.env
 
 # Folders
 /data/
