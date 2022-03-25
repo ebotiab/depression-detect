@@ -5,8 +5,6 @@ import random
 from spectrogram_dicts import build_class_dictionaries
 from dotenv import find_dotenv, load_dotenv
 
-np.random.seed(15)  # for reproducibility
-
 # find .env automagically by walking up directories until it's found, then
 # load up the .env entries as environment variables
 load_dotenv(find_dotenv())
@@ -14,6 +12,8 @@ load_dotenv(find_dotenv())
 ACCESS_KEY = os.environ['AWS_ACCESS_KEY_ID']
 ACCESS_SECRET_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
 BUCKET_NAME = os.environ['AWS_BUCKET_NAME']
+
+np.random.seed(15)  # for reproducibility
 
 """
 There exists a large data imbalance between positive and negative samples,
@@ -205,8 +205,8 @@ def rand_samp_train_test_split(npz_file_dir):
         with np.load(npz_file) as data:
             for key in data.keys():
                 train_samples.append(data[key])
-    train_labels = np.concatenate((np.ones(len(dep_select_samples[:-num_test_samples])),
-                                   np.zeros(len(norm_select_samples[:-num_test_samples]))))
+    train_labels = np.concatenate((np.ones(int(len(train_samples)/2)),
+                                   np.zeros(int(len(train_samples)/2))))
 
     test_samples = []
     for sample in dep_select_samples[-num_test_samples:]:
@@ -219,8 +219,8 @@ def rand_samp_train_test_split(npz_file_dir):
         with np.load(npz_file) as data:
             for key in data.keys():
                 test_samples.append(data[key])
-    test_labels = np.concatenate((np.ones(len(dep_select_samples[-num_test_samples:])),
-                                  np.zeros(len(norm_select_samples[-num_test_samples:]))))
+    test_labels = np.concatenate((np.ones(int(len(test_samples)/2)),
+                                  np.zeros(int(len(test_samples)/2))))
 
     return np.array(train_samples), train_labels, np.array(test_samples), \
         test_labels

@@ -2,6 +2,7 @@ from __future__ import print_function
 import boto
 import os
 import numpy as np
+from dotenv import find_dotenv, load_dotenv
 from sklearn.metrics import confusion_matrix
 from plot_metrics import plot_accuracy, plot_loss, plot_roc_curve
 from keras.models import Sequential
@@ -9,14 +10,21 @@ from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 from keras.utils import np_utils
 from keras import backend as K
-K.set_image_dim_ordering('th')
-access_key = os.environ['AWS_ACCESS_KEY_ID']
-access_secret_key = os.environ['AWS_SECRET_ACCESS_KEY']
+K.set_image_data_format('channels_first')
+
+# find .env automagically by walking up directories until it's found, then
+# load up the .env entries as environment variables
+load_dotenv(find_dotenv())
+
+ACCESS_KEY = os.environ['AWS_ACCESS_KEY_ID']
+ACCESS_SECRET_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
+BUCKET_NAME = os.environ['AWS_BUCKET_NAME']
+
 np.random.seed(15)  # for reproducibility
 
 
 """
-CNN used to classify spectrograms of normal participants (0) or depressed
+CNN used to classify spectrogram's of normal participants (0) or depressed
 participants (1). Using Theano backend and Theano image_dim_ordering:
 (# channels, # images, # rows, # cols)
 (1, 3040, 513, 125)
@@ -27,8 +35,8 @@ def retrieve_from_bucket(file):
     """
     Download spectrogram representation of matrices from S3 bucket.
     """
-    conn = boto.connect_s3(access_key, access_secret_key)
-    bucket = conn.get_bucket('depression-detect')
+    conn = boto.connect_s3(ACCESS_KEY, ACCESS_SECRET_KEY)
+    bucket = conn.get_bucket(BUCKET_NAME)
     file_key = bucket.get_key(file)
     file_key.get_contents_to_filename(file)
     X = np.load(file)
@@ -68,14 +76,15 @@ def prep_train_test(X_train, y_train, X_test, y_test, nb_classes):
 
 def keras_img_prep(X_train, X_test, img_dep, img_rows, img_cols):
     """
-    Reshape feature matrices for Keras' expexcted input dimensions.
+    Reshape feature matrices for Keras' expected input dimensions.
     For 'th' (Theano) dim_order, the model expects dimensions:
-    (# channels, # images, # rows, # cols).
+    (# channels, # images, # rows, # cols). (actually # images, # rows, # cols, #channels)
     """
-    if K.image_dim_ordering() == 'th':
+    if K.image_data_format() == 'channels_first':
         X_train = X_train.reshape(X_train.shape[0], 1, img_rows, img_cols)
         X_test = X_test.reshape(X_test.shape[0], 1, img_rows, img_cols)
-        input_shape = (1, img_rows, img_cols)
+        # input_shape = (1, img_rows, img_cols)
+        input_shape = (img_rows, img_cols, 1)
     else:
         X_train = X_train.reshape(X_train.shape[0], img_rows, img_cols, 1)
         X_test = X_test.reshape(X_test.shape[0], img_rows, img_cols, 1)
@@ -157,8 +166,8 @@ def standard_confusion_matrix(y_test, y_test_pred):
                   -----------
     Parameters
     ----------
-    y_true : ndarray - 1D
-    y_pred : ndarray - 1D
+    y_test : ndarray - 1D
+    y_test_pred : ndarray - 1D
 
     Returns
     -------
@@ -170,10 +179,10 @@ def standard_confusion_matrix(y_test, y_test_pred):
 
 def save_to_bucket(file, obj_name):
     """
-    Saves local file to S3 bucket for redundancy and repreoducibility
+    Saves local file to S3 bucket for redundancy and reproducibility
     by others.
     """
-    conn = boto.connect_s3(access_key, access_secret_key)
+    conn = boto.connect_s3(ACCESS_KEY, ACCESS_SECRET_KEY)
 
     bucket = conn.get_bucket('depression-detect')
 
@@ -199,7 +208,7 @@ if __name__ == '__main__':
     nb_classes = 2
     epochs = 7
 
-    # normalalize data and prep for Keras
+    # normalize data and prep for Keras
     print('Processing images for Keras...')
     X_train, X_test, y_train, y_test = prep_train_test(X_train, y_train,
                                                        X_test, y_test,
@@ -239,7 +248,7 @@ if __name__ == '__main__':
     print("Recall: {}".format(recall))
     print("F1-Score: {}".format(f1_score))
 
-    # plot train/test loss and accuracy. saves files in working dir
+    # plot train/test loss and accuracy. Save files in working dir
     print('Saving plots...')
     plot_loss(history, model_id)
     plot_accuracy(history, model_id)
