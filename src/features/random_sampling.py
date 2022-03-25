@@ -3,10 +3,17 @@ import numpy as np
 import os
 import random
 from spectrogram_dicts import build_class_dictionaries
-np.random.seed(15)  # for reproducibility
-access_key = os.environ['AWS_ACCESS_KEY_ID']
-access_secret_key = os.environ['AWS_SECRET_ACCESS_KEY']
+from dotenv import find_dotenv, load_dotenv
 
+np.random.seed(15)  # for reproducibility
+
+# find .env automagically by walking up directories until it's found, then
+# load up the .env entries as environment variables
+load_dotenv(find_dotenv())
+
+ACCESS_KEY = os.environ['AWS_ACCESS_KEY_ID']
+ACCESS_SECRET_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
+BUCKET_NAME = os.environ['AWS_BUCKET_NAME']
 
 """
 There exists a large data imbalance between positive and negative samples,
@@ -16,9 +23,9 @@ samples for learning, the model will have a strong bias to the non-depressed
 class. Moreover, regarding the length of each sample, a much longer signal of
 an individual may emphasize some characteristics that are person specific.
 To solve the problem, I perform random cropping on each of the participant's
-spectrograms of a specified width (time) and constant height (frequency), to
+spectrogram's of a specified width (time) and constant height (frequency), to
 ensure the CNN has an equal proportion for every subject and each class. The
-size of the Hanning window is 1024, and the audio sample rate is 16000 Hz,
+size of the Hamming window is 1024, and the audio sample rate is 16000 Hz,
 which leads to a covering domain of 1024/16000 Hz=0.064s; accordingly, the
 hop size is 32ms, half of the analysis window. Meaning each pixel of width
 represents 32ms. Some success has been found using random crops of 3-5
@@ -40,7 +47,11 @@ def determine_num_crops(depressed_dict, normal_dict, crop_width=125):
     depressed_dict : dictionary
         a dictionary of depressed participants with the participant id as the
         key and the segmented and concatenated matrix representation of
-        their spectrograms as the values.
+        their spectrogram's as the values.
+    normal_dict : dictionary
+        a dictionary of not depressed participants with the participant id as the
+        key and the segmented and concatenated matrix representation of
+        their spectrogram's as the values.
     crop_width : integer
         the desired pixel width of the crop samples
         (125 pixels = 4 seconds of audio)
@@ -51,10 +62,10 @@ def determine_num_crops(depressed_dict, normal_dict, crop_width=125):
         the maximum number of samples that should be sampled from each clip
         to ensure balanced classes can be built.
     """
-    merged_dict = dict(normal_dict, **depressed_dict)
+    merged_dict = {**normal_dict, **depressed_dict}
     shortest_clip = min(merged_dict.items(), key=lambda x: x[1].shape[1])
     shortest_pixel_width = shortest_clip[1].shape[1]
-    num_samples_from_clips = shortest_pixel_width / crop_width
+    num_samples_from_clips = int(shortest_pixel_width / crop_width)
     return num_samples_from_clips
 
 
@@ -84,9 +95,9 @@ def build_class_sample_dict(segmented_audio_dict, n_samples, crop_width):
         list have dimension (numFrequencyBins * crop_width)
     """
     class_samples_dict = dict()
-    for partic_id, clip_mat in segmented_audio_dict.iteritems():
-            samples = get_random_samples(clip_mat, n_samples, crop_width)
-            class_samples_dict[partic_id] = samples
+    for participant_id, clip_mat in segmented_audio_dict.items():
+        samples = get_random_samples(clip_mat, n_samples, crop_width)
+        class_samples_dict[participant_id] = samples
     return class_samples_dict
 
 
@@ -110,9 +121,9 @@ def create_sample_dicts(crop_width):
     Utilizes the above function to return two dictionaries, depressed
     and normal. Each dictionary has only participants in the specific class,
     with participant ids as key, a values of a list of the cropped samples
-    from the spectrogram matrices. The lists are vary in length depending
+    from the spectrogram matrices. The lists vary in length depending
     on the length of the interview clip. The entries within the list are
-    numpy arrays with dimennsion (513, 125).
+    numpy arrays with dimension (513, 125).
     """
     # build dictionaries of participants and segmented audio matrix
     depressed_dict, normal_dict = build_class_dictionaries('../../data/interim')
@@ -125,15 +136,15 @@ def create_sample_dicts(crop_width):
     normal_samples = build_class_sample_dict(normal_dict, n_samples,
                                              crop_width)
     # iterate through samples dictionaries and save a npz file
-    # with the radomly sleected n_samples for each participant.
+    # with the randomly selected n_samples for each participant.
     # save depressed arrays to .npz
-    for key, _ in depressed_samples.iteritems():
+    for key, _ in depressed_samples.items():
         path = '../../data/processed/'
         filename = 'D{}.npz'.format(key)
         outfile = path + filename
         np.savez(outfile, *depressed_samples[key])
     # save normal arrays to .npz
-    for key, _ in normal_samples.iteritems():
+    for key, _ in normal_samples.items():
         path = '../../data/processed'
         filename = '/N{}.npz'.format(key)
         outfile = path + filename
@@ -142,11 +153,13 @@ def create_sample_dicts(crop_width):
 
 def rand_samp_train_test_split(npz_file_dir):
     """
-    Given the cropped segments from each class and particpant, this fucntion
-    determines how many samples we can draw from each particpant and how many
+    Given the cropped segments from each class and participant, this function
+    determines how many samples we can draw from each participant and how many
     participants we can draw from each class.
 
-    Parameters
+    Parameters    # find .env automagically by walking up directories until it's found, then
+    # load up the .env entries as environment variables
+    load_dotenv(find_dotenv())
     ----------
     npz_file_dir : directory
         directory contain the
@@ -163,51 +176,51 @@ def rand_samp_train_test_split(npz_file_dir):
     # files in directory
     npz_files = os.listdir(npz_file_dir)
 
-    dep_samps = [f for f in npz_files if f.startswith('D')]
-    norm_samps = [f for f in npz_files if f.startswith('N')]
+    dep_samples = [f for f in npz_files if f.startswith('D')]
+    norm_samples = [f for f in npz_files if f.startswith('N')]
     # calculate how many samples to balance classes
-    max_samples = min(len(dep_samps), len(norm_samps))
+    max_samples = min(len(dep_samples), len(norm_samples))
 
     # randomly select max participants from each class without replacement
-    dep_select_samps = np.random.choice(dep_samps, size=max_samples,
-                                        replace=False)
-    norm_select_samps = np.random.choice(norm_samps, size=max_samples,
-                                         replace=False)
+    dep_select_samples = np.random.choice(dep_samples, size=max_samples,
+                                          replace=False)
+    norm_select_samples = np.random.choice(norm_samples, size=max_samples,
+                                           replace=False)
 
     # randomly select n_samples_per_person (40 in the case of a crop width
     # of 125) from each of the participant lists
 
     # REFACTOR this code!
     test_size = 0.2
-    num_test_samples = int(len(dep_select_samps) * test_size)
+    num_test_samples = int(len(dep_select_samples) * test_size)
 
     train_samples = []
-    for sample in dep_select_samps[:-num_test_samples]:
+    for sample in dep_select_samples[:-num_test_samples]:
         npz_file = npz_file_dir + '/' + sample
         with np.load(npz_file) as data:
             for key in data.keys():
                 train_samples.append(data[key])
-    for sample in norm_select_samps[:-num_test_samples]:
+    for sample in norm_select_samples[:-num_test_samples]:
         npz_file = npz_file_dir + '/' + sample
         with np.load(npz_file) as data:
             for key in data.keys():
                 train_samples.append(data[key])
-    train_labels = np.concatenate((np.ones(len(train_samples)/2),
-                                   np.zeros(len(train_samples)/2)))
+    train_labels = np.concatenate((np.ones(len(dep_select_samples[:-num_test_samples])),
+                                   np.zeros(len(norm_select_samples[:-num_test_samples]))))
 
     test_samples = []
-    for sample in dep_select_samps[-num_test_samples:]:
+    for sample in dep_select_samples[-num_test_samples:]:
         npz_file = npz_file_dir + '/' + sample
         with np.load(npz_file) as data:
             for key in data.keys():
                 test_samples.append(data[key])
-    for sample in norm_select_samps[-num_test_samples:]:
+    for sample in norm_select_samples[-num_test_samples:]:
         npz_file = npz_file_dir + '/' + sample
         with np.load(npz_file) as data:
             for key in data.keys():
                 test_samples.append(data[key])
-    test_labels = np.concatenate((np.ones(len(test_samples)/2),
-                                  np.zeros(len(test_samples)/2)))
+    test_labels = np.concatenate((np.ones(len(dep_select_samples[-num_test_samples:])),
+                                  np.zeros(len(norm_select_samples[-num_test_samples:]))))
 
     return np.array(train_samples), train_labels, np.array(test_samples), \
         test_labels
@@ -217,19 +230,20 @@ def save_to_bucket(file, obj_name):
     """
     Saves local file to S3 bucket for redundancy and reproducibility.
     """
-    conn = boto.connect_s3(access_key, access_secret_key)
-    bucket = conn.get_bucket('depression-detect')
+    conn = boto.connect_s3(ACCESS_KEY, ACCESS_SECRET_KEY)
+    bucket = conn.get_bucket(BUCKET_NAME)
     file_object = bucket.new_key(obj_name)
     file_object.set_contents_from_filename(file)
 
 
 if __name__ == '__main__':
     # build participant's cropped npz files
-    # this is of the whole no_silence particpant's no_silence interview,
+    # this is of the whole no_silence participant's no_silence interview,
     # but each array in the npz files was width of crop_width
-    create_sample_dicts(crop_width=125)
 
-    # random sample from particpants npz files to ensure class balance
+    # create_sample_dicts(crop_width=125)
+
+    # random sample from participants npz files to ensure class balance
     train_samples, train_labels, test_samples, \
         test_labels = rand_samp_train_test_split('../../data/processed')
 

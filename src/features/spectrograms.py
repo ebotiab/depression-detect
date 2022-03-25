@@ -108,6 +108,6 @@ if __name__ == '__main__':
         for file in files:
             if file.endswith('.wav'):
                 wav_file = os.path.join(subdir, file)
-                png_name = subdir + '/' + file[:-4] + '.png'
+                png_path = subdir + '/' + file[:-4] + '.png'
                 print('Processing ' + file + '...')
-                stft_matrix(wav_file, png_name=png_name, save_png=True)
+                stft_matrix(wav_file, png_name=png_path, save_png=True)
