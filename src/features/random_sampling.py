@@ -3,7 +3,12 @@ import numpy as np
 import os
 import random
 from spectrogram_dicts import build_class_dictionaries
+from dotenv import find_dotenv, load_dotenv
+
 np.random.seed(15)  # for reproducibility
+# find .env automagically by walking up directories until it's found, then
+# load up the .env entries as environment variables
+load_dotenv(find_dotenv())
 access_key = os.environ['AWS_ACCESS_KEY_ID']
 access_secret_key = os.environ['AWS_SECRET_ACCESS_KEY']
 
