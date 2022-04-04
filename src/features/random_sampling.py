@@ -56,7 +56,7 @@ def determine_num_crops(depressed_dict, normal_dict, crop_width=125):
         the maximum number of samples that should be sampled from each clip
         to ensure balanced classes can be built.
     """
-    merged_dict = dict(normal_dict, **depressed_dict)
+    merged_dict = {**normal_dict, **depressed_dict}
     shortest_clip = min(merged_dict.items(), key=lambda x: x[1].shape[1])
     shortest_pixel_width = shortest_clip[1].shape[1]
     num_samples_from_clips = shortest_pixel_width / crop_width
