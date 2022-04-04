@@ -49,10 +49,10 @@ def remove_silence(filename, out_dir, smoothing=1.0, weight=0.3, plot=False):
 
         os.chdir(participant_dir)
 
-        [Fs, x] = aIO.readAudioFile(filename)
-        segments = aS.silenceRemoval(x, Fs, 0.020, 0.020,
-                                     smoothWindow=smoothing,
-                                     Weight=weight,
+        [Fs, x] = aIO.read_audio_file(filename)
+        segments = aS.silence_removal(x, Fs, 0.020, 0.020,
+                                     smooth_window=smoothing,
+                                     weight=weight,
                                      plot=plot)
 
         for s in segments:
@@ -108,11 +108,11 @@ def concatenate_segments(participant_dir, partic_id, remove_segment=True):
 
 if __name__ == '__main__':
     # directory containing raw wav files
-    dir_name = '../../data/raw/audio'
+    dir_name = '/home/ebbarbera/depression-detect/data/raw/audio'
 
     # directory where a participant folder will be created containing their
     # segmented wav file
-    out_dir = '../../data/interim'
+    out_dir = '/home/ebbarbera/depression-detect/data/interim'
 
     # iterate through wav files in dir_name and create a segmented wav_file
     for file in os.listdir(dir_name):
