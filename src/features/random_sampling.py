@@ -59,7 +59,7 @@ def determine_num_crops(depressed_dict, normal_dict, crop_width=125):
     merged_dict = {**normal_dict, **depressed_dict}
     shortest_clip = min(merged_dict.items(), key=lambda x: x[1].shape[1])
     shortest_pixel_width = shortest_clip[1].shape[1]
-    num_samples_from_clips = shortest_pixel_width / crop_width
+    num_samples_from_clips = int(shortest_pixel_width / crop_width)
     return num_samples_from_clips
 
 
