@@ -18,9 +18,9 @@ def stft(sig, frameSize, overlapFac=0.5, window=np.hanning):
     win = window(frameSize)
     hopSize = int(frameSize - np.floor(overlapFac * frameSize))
     # zeros at beginning (thus center of 1st window should be for sample nr. 0)
-    samples = np.append(np.zeros(np.floor(frameSize/2.0)), sig)
+    samples = np.append(np.zeros(int(np.floor(frameSize/2.0))), sig)
     # cols for windowing
-    cols = np.ceil((len(samples) - frameSize) / float(hopSize)) + 1
+    cols = int(np.ceil((len(samples) - frameSize) / float(hopSize)) + 1)
     # zeros at end (thus samples can be fully covered by frames)
     samples = np.append(samples, np.zeros(frameSize))
 
@@ -41,6 +41,7 @@ def logscale_spec(spec, sr=44100, factor=20.):
     scale = np.linspace(0, 1, freqbins) ** factor
     scale *= (freqbins-1)/max(scale)
     scale = np.unique(np.round(scale))
+    scale = scale.astype(int)
 
     # create spectrogram with new freq bins
     newspec = np.complex128(np.zeros([timebins, len(scale)]))
