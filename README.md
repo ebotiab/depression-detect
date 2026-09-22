@@ -1,3 +1,15 @@
+# Research fork of DepressionDetect
+
+This is a fork of [kykiefer/depression-detect](https://github.com/kykiefer/depression-detect). The original project, report, figures and performance claims in the documentation below belong to the upstream author.
+
+The fork contains additional work on archive extraction, speech segmentation, spectrogram preparation and CNN compatibility, plus a dependency list. These changes are recorded in the [comparison with upstream](https://github.com/kykiefer/depression-detect/compare/master...ebotiab:master); the upstream results have not been revalidated for this fork.
+
+For a separate research pipeline with preprocessing, training and an exploration interface, see [ade-daic-woz](https://github.com/ebotiab/ade-daic-woz).
+
+---
+
+## Upstream documentation
+
 # *DepressionDetect*
 This effort addresses an automated device for detecting depression from acoustic features in speech.  The tool is aimed at lowering the barrier of entry in seeking help for potential mental illness and supporting medical professionals' diagnoses.
 
